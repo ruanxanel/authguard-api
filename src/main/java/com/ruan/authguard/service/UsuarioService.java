@@ -1,5 +1,6 @@
 package com.ruan.authguard.service;
 
+import com.ruan.authguard.dto.UsuarioResponseDTO;
 import com.ruan.authguard.entity.UsuarioEntity;
 import com.ruan.authguard.enums.Role;
 import com.ruan.authguard.exception.UsuarioCadastradoException;
@@ -23,6 +24,10 @@ public class UsuarioService {
     }
 
     public UsuarioEntity criarPerfil(UUID id, String nome, String email) {
+
+        if (usuarioRepository.existsById(id)) {
+            throw new UsuarioCadastradoException("Usuário já cadastrado");
+        }
         if (usuarioRepository.existsByEmail(email)) {
             throw new UsuarioCadastradoException("E-mail já cadastrado");
         }
@@ -34,5 +39,16 @@ public class UsuarioService {
         usuario.setRole(Role.USER);
 
         return usuarioRepository.save(usuario);
+    }
+
+    public UsuarioResponseDTO converterParaDTO(UsuarioEntity usuario) {
+
+        return new UsuarioResponseDTO(
+                usuario.getId(),
+                usuario.getNome(),
+                usuario.getEmail(),
+                usuario.getRole(),
+                usuario.getCriadoEm()
+        );
     }
 }
