@@ -32,6 +32,7 @@ public class UsuarioEntity {
     @Column(nullable = false, updatable = false)
     private LocalDateTime criadoEm;
 
+    @PrePersist
     public void prePersist() {
         if (criadoEm == null) {
             criadoEm = LocalDateTime.now();
