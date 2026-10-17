@@ -1,3 +1,13 @@
 spring:
   application:
     name: authguard
+
+datasource:
+  url: jdbc:postgresql://localhost:5434/authguard_db
+  username: ${POSTGRES_USER}
+  password: ${POSTGRES_PASSWORD}
+
+jpa:
+  hibernate:
+    ddl-auto: none
+  show-sql: true
