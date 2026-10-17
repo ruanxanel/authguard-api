@@ -12,3 +12,14 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-api: https://pkrpihbdbtqcjhvwbknm.supabase.co/auth/v1
+          jwk-set-uri: https://pkrpihbdbtqcjhvwbknm.supabase.co/auth/v1/.well-known/jwks.json
+          jws-algorithms:
+            - ES256
+          audiences:
+            - authenticated
