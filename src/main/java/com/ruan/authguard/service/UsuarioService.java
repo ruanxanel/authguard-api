@@ -51,4 +51,14 @@ public class UsuarioService {
                 usuario.getCriadoEm()
         );
     }
+
+    public UsuarioEntity atualizarPerfil(UUID id, String nome) {
+        UsuarioEntity usuario = buscarPorId(id);
+
+        usuario.setNome(nome);
+
+        usuarioRepository.save(usuario);
+
+        return usuario;
+    }
 }

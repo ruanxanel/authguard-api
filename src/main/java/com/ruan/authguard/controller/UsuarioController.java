@@ -26,6 +26,7 @@ public class UsuarioController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UsuarioRequestDTO request
             ) {
+
         UUID uuid = UUID.fromString(jwt.getSubject());
         String email = jwt.getClaimAsString("email");
 
@@ -45,6 +46,23 @@ public class UsuarioController {
     ) {
         UUID uuid = UUID.fromString(jwt.getSubject());
         UsuarioEntity usuario = usuarioService.buscarPorId(uuid);
+        UsuarioResponseDTO response = usuarioService.converterParaDTO(usuario);
+
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<UsuarioResponseDTO> atualizarPerfil(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UsuarioRequestDTO request
+    ) {
+        UUID uuid = UUID.fromString(jwt.getSubject());
+
+        UsuarioEntity usuario = usuarioService.atualizarPerfil(
+                uuid,
+                request.nome()
+        );
+
         UsuarioResponseDTO response = usuarioService.converterParaDTO(usuario);
 
         return ResponseEntity.ok(response);
