@@ -1,5 +1,8 @@
 package com.ruan.authguard.config;
 
+import com.ruan.authguard.security.CustomAccessDeniedHandler;
+import com.ruan.authguard.security.JwtAuthenticationEntryPoint;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -9,7 +12,11 @@ import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
 @EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
+
+    private final JwtAuthenticationEntryPoint authenticationEntryPoint;
+    private final CustomAccessDeniedHandler accessDeniedHandler;
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -25,8 +32,14 @@ public class SecurityConfig {
                     .requestMatchers("/api/public/**").permitAll()
                     .anyRequest().authenticated()
             )
-            .oauth2ResourceServer(ouath2 -> ouath2
-                    .jwt(jwt ->{})
+            .exceptionHandling(ex -> ex
+                    .authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler)
+            )
+            .oauth2ResourceServer(oauth2 -> oauth2
+                    .authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler)
+                    .jwt(jwt -> {})
             );
 
         return http.build();
