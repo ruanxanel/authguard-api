@@ -2,7 +2,8 @@ package com.ruan.authguard.controller;
 
 import com.ruan.authguard.dto.UsuarioRequestDTO;
 import com.ruan.authguard.dto.UsuarioResponseDTO;
-import com.ruan.authguard.entity.UsuarioEntity;
+import com.ruan.authguard.security.IdentidadeAutenticada;
+import com.ruan.authguard.security.UsuarioAutenticado;
 import com.ruan.authguard.service.UsuarioService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,30 +13,24 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 @RestController
 @RequestMapping("/api/user")
 @RequiredArgsConstructor
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
+    private final UsuarioAutenticado usuarioAutenticado;
 
     @PostMapping("/profile")
     public ResponseEntity<UsuarioResponseDTO> criarPerfil(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UsuarioRequestDTO request
-            ) {
+    ) {
+        IdentidadeAutenticada identidade =
+                usuarioAutenticado.extrair(jwt);
 
-        UUID uuid = UUID.fromString(jwt.getSubject());
-        String email = jwt.getClaimAsString("email");
-
-        if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("E-mail não enontrado no token");
-        }
-
-        UsuarioEntity usuario = usuarioService.criarPerfil(uuid, request.nome(), email);
-        UsuarioResponseDTO response = usuarioService.converterParaDTO(usuario);
+        UsuarioResponseDTO response =
+                usuarioService.criarPerfil(identidade, request.nome());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -44,9 +39,11 @@ public class UsuarioController {
     public ResponseEntity<UsuarioResponseDTO> buscarPerfil(
             @AuthenticationPrincipal Jwt jwt
     ) {
-        UUID uuid = UUID.fromString(jwt.getSubject());
-        UsuarioEntity usuario = usuarioService.buscarPorId(uuid);
-        UsuarioResponseDTO response = usuarioService.converterParaDTO(usuario);
+        IdentidadeAutenticada identidade =
+                usuarioAutenticado.extrair(jwt);
+
+        UsuarioResponseDTO response =
+                usuarioService.buscarPerfil(identidade.id());
 
         return ResponseEntity.ok(response);
     }
@@ -56,14 +53,14 @@ public class UsuarioController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UsuarioRequestDTO request
     ) {
-        UUID uuid = UUID.fromString(jwt.getSubject());
+        IdentidadeAutenticada identidade =
+                usuarioAutenticado.extrair(jwt);
 
-        UsuarioEntity usuario = usuarioService.atualizarPerfil(
-                uuid,
-                request.nome()
-        );
-
-        UsuarioResponseDTO response = usuarioService.converterParaDTO(usuario);
+        UsuarioResponseDTO response =
+                usuarioService.atualizarPerfil(
+                        identidade.id(),
+                        request.nome()
+                );
 
         return ResponseEntity.ok(response);
     }

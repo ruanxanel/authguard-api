@@ -1,6 +1,7 @@
 package com.ruan.authguard.exception;
 
 import com.ruan.authguard.dto.ErrorResponse;
+import com.ruan.authguard.security.IdentidadeInvalidaException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -58,5 +59,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(corpo);
+    }
+
+    @ExceptionHandler(IdentidadeInvalidaException.class)
+    public ResponseEntity<ErrorResponse> handleIdentidadeInvalida(
+            IdentidadeInvalidaException ex
+    ) {
+        ErrorResponse corpo = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Unauthorized",
+                ex.getMessage(),
+                LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS)
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(corpo);
     }
 }

@@ -1,13 +1,17 @@
 package com.ruan.authguard.service;
 
+import com.ruan.authguard.dto.UsuarioRequestDTO;
 import com.ruan.authguard.dto.UsuarioResponseDTO;
 import com.ruan.authguard.entity.UsuarioEntity;
 import com.ruan.authguard.enums.Role;
 import com.ruan.authguard.exception.UsuarioCadastradoException;
 import com.ruan.authguard.exception.UsuarioNaoEncontradoException;
+import com.ruan.authguard.mapper.UsuarioMapper;
 import com.ruan.authguard.repository.UsuarioRepository;
+import com.ruan.authguard.security.IdentidadeAutenticada;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -16,49 +20,64 @@ import java.util.UUID;
 public class UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
+    private final UsuarioMapper usuarioMapper;
 
-    public UsuarioEntity buscarPorId(UUID id) {
+    @Transactional(readOnly = true)
+    public UsuarioResponseDTO buscarPerfil(UUID id) {
+        UsuarioEntity usuario = buscarPorId(id);
 
-        return usuarioRepository.findById(id)
-               .orElseThrow(() -> new UsuarioNaoEncontradoException("Usuario não encontrado"));
+        return usuarioMapper.paraDTO(usuario);
     }
 
-    public UsuarioEntity criarPerfil(UUID id, String nome, String email) {
+    @Transactional
+    public UsuarioResponseDTO criarPerfil(
+            IdentidadeAutenticada identidade,
+            String nome
+    ) {
+        UUID id = identidade.id();
+        String email = identidade.email();
 
         if (usuarioRepository.existsById(id)) {
-            throw new UsuarioCadastradoException("Usuário já cadastrado");
+            throw new UsuarioCadastradoException(
+                    "Usuário já cadastrado"
+            );
         }
+
         if (usuarioRepository.existsByEmail(email)) {
-            throw new UsuarioCadastradoException("E-mail já cadastrado");
+            throw new UsuarioCadastradoException(
+                    "E-mail já cadastrado"
+            );
         }
 
         UsuarioEntity usuario = new UsuarioEntity();
+
         usuario.setId(id);
         usuario.setNome(nome);
         usuario.setEmail(email);
         usuario.setRole(Role.USER);
 
-        return usuarioRepository.save(usuario);
+        UsuarioEntity salvo = usuarioRepository.save(usuario);
+
+        return usuarioMapper.paraDTO(salvo);
     }
 
-    public UsuarioResponseDTO converterParaDTO(UsuarioEntity usuario) {
-
-        return new UsuarioResponseDTO(
-                usuario.getId(),
-                usuario.getNome(),
-                usuario.getEmail(),
-                usuario.getRole(),
-                usuario.getCriadoEm()
-        );
-    }
-
-    public UsuarioEntity atualizarPerfil(UUID id, String nome) {
+    @Transactional
+    public UsuarioResponseDTO atualizarPerfil(UUID id, String nome) {
         UsuarioEntity usuario = buscarPorId(id);
 
         usuario.setNome(nome);
 
-        usuarioRepository.save(usuario);
+        UsuarioEntity salvo = usuarioRepository.save(usuario);
 
-        return usuario;
+        return usuarioMapper.paraDTO(salvo);
+    }
+
+    private UsuarioEntity buscarPorId(UUID id) {
+        return usuarioRepository.findById(id)
+                .orElseThrow(() ->
+                        new UsuarioNaoEncontradoException(
+                                "Usuário não encontrado"
+                        )
+                );
     }
 }
