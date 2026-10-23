@@ -11,6 +11,29 @@ services:
       - "5434:5432"
     volumes:
       - authguard_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  authguard-api:
+    build: .
+    image: authguard-api:latest
+    container_name: authguard-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DDL_AUTO: update
+      SHOW_SQL: "false"
+      PORT: 8080
+    ports:
+      - "8080:8080"
 
 volumes:
   authguard_data:
