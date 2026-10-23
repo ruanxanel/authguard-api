@@ -11,6 +11,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import com.ruan.authguard.exception.UsuarioNaoEncontradoException;
+import com.ruan.authguard.exception.UsuarioCadastradoException;
 
 
 import java.util.UUID;
@@ -211,8 +213,66 @@ class UsuarioControllerTest {
                                     "nome": ""
                                 }
                                 """))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.erro").exists())
+                .andExpect(jsonPath("$.mensagem").exists())
+                .andExpect(jsonPath("$.timestamp").exists());
+
 
         verifyNoInteractions(usuarioService);
+    }
+
+    @Test
+    void deveRetornar404QuandoUsuarioNaoForEncontrado() throws Exception {
+
+        UUID id = UUID.randomUUID();
+        String email = "user@example.com";
+
+
+        when(usuarioService.buscarPerfil(id))
+                .thenThrow(new UsuarioNaoEncontradoException("Usuário não encontrado"));
+
+        mockMvc.perform(get("/api/user/profile")
+                        .with(jwt().jwt(token -> token
+                                .subject(id.toString())
+                                .claim("email", email)
+                        )))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.mensagem").value("Usuário não encontrado"));
+
+        verify(usuarioService).buscarPerfil(id);
+    }
+
+    @Test
+    void deveRetornar409QuandoUsuarioJaEstiverCadastrado() throws Exception {
+
+        UUID id = UUID.randomUUID();
+        String email = "user@example.com";
+        String nome = "Farao";
+
+        IdentidadeAutenticada identidade =
+                new IdentidadeAutenticada(id, email);
+
+        when(usuarioService.criarPerfil(eq(identidade), eq(nome)))
+                .thenThrow(new UsuarioCadastradoException("Usuário já cadastrado"));
+
+        mockMvc.perform(post("/api/user/profile")
+                        .with(jwt().jwt(token -> token
+                                .subject(id.toString())
+                                .claim("email", email)
+                        ))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "nome": "Farao"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.mensagem").value("Usuário já cadastrado"));
+
+        verify(usuarioService).criarPerfil(eq(identidade), eq(nome));
     }
 }
