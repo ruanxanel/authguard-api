@@ -15,6 +15,8 @@ import com.ruan.authguard.exception.UsuarioNaoEncontradoException;
 import com.ruan.authguard.exception.UsuarioCadastradoException;
 
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -189,18 +191,6 @@ class UsuarioControllerTest {
 
         UUID id = UUID.randomUUID();
         String email = "user@example.com";
-        String novoNome = "";
-
-        UsuarioResponseDTO response = new UsuarioResponseDTO(
-                id,
-                novoNome,
-                email,
-                Role.USER,
-                null
-        );
-
-        when(usuarioService.atualizarPerfil(eq(id), eq(novoNome)))
-                .thenReturn(response);
 
         mockMvc.perform(put("/api/user/profile")
                         .with(jwt().jwt(token -> token
@@ -274,5 +264,45 @@ class UsuarioControllerTest {
                 .andExpect(jsonPath("$.mensagem").value("Usuário já cadastrado"));
 
         verify(usuarioService).criarPerfil(eq(identidade), eq(nome));
+    }
+
+    @Test
+    void deveRetornar401QuandoTokenForInvalido() throws Exception {
+
+        mockMvc.perform(get("/api/user/profile")
+                        .header("Authorization", "Bearer token-invalido"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void deveRetornar401QuandoAssinaturaDoTokenForInvalida() throws Exception {
+
+        String header = """ 
+                {"alg":"RS256","typ":"JWT"}
+                """;
+
+        String payload = """
+                {
+                    "sub": "123e4567-e89b-12d3-a456-426614174000",
+                    "email": "user@example.com"
+                }
+                """;
+
+        String headerBase64 = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(header.getBytes(StandardCharsets.UTF_8));
+
+        String payloadBase64 = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+
+        String token = headerBase64 + "." + payloadBase64 + ".assinatura-falsa";
+
+        mockMvc.perform(get("/api/user/profile")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(usuarioService);
+
     }
 }
