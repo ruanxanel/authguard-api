@@ -3,15 +3,15 @@ spring:
     name: authguard
 
   datasource:
-    url: jdbc:postgresql://localhost:5434/authguard_db
+    url: ${DB_URL:jdbc:postgresql://localhost:5434/authguard_db}
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${DDL_AUTO:update}
+    show-sql: ${SHOW_SQL:true}
 
   security:
     oauth2:
@@ -23,3 +23,6 @@ spring:
             - ES256
           audiences:
             - authenticated
+
+server:
+  port: ${PORT:8080}
