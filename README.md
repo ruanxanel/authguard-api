@@ -2,7 +2,18 @@
 
 **API REST de gerenciamento de perfis com autenticação JWT, autorização por papéis e documentação interativa.**
 
-O **AuthGuard** é um projeto Back-End desenvolvido em **Java 21 e Spring Boot 4**, com foco em boas práticas de arquitetura, segurança e testes automatizados. A autenticação é realizada pelo **Supabase Auth**, enquanto a API valida os tokens JWT e gerencia, no **PostgreSQL**, o perfil e as permissões de cada usuário.
+O **AuthGuard** é um projeto Back-End desenvolvido com **Java 21 e Spring Boot 4.1.1**, com foco em arquitetura em camadas, segurança e testes automatizados. A autenticação é realizada pelo **Supabase Auth**, enquanto a API valida os JWTs e gerencia os perfis e as permissões dos usuários no **PostgreSQL**.
+
+## API em produção
+
+A API está hospedada no **Render**, usando **Docker**, com o banco PostgreSQL gerenciado pelo **Neon**.
+
+- **API:** https://authguard-api-bmzi.onrender.com
+- **Swagger UI:** https://authguard-api-bmzi.onrender.com/swagger-ui/index.html
+- **OpenAPI JSON:** https://authguard-api-bmzi.onrender.com/v3/api-docs
+- **Repositório:** https://github.com/ruanxanel/authguard-api
+
+> **Observação:** no plano gratuito do Render, a API pode entrar em repouso após um período de inatividade. A primeira requisição pode demorar mais para responder. A rota raiz (`/`) não possui endpoint público; sem autenticação, ela pode retornar `401 Unauthorized`.
 
 ## Funcionalidades
 
@@ -12,8 +23,9 @@ O **AuthGuard** é um projeto Back-End desenvolvido em **Java 21 e Spring Boot 4
 - Autorização por papéis (`USER` e `ADMIN`) consultados no banco de dados.
 - Validação de entrada e tratamento padronizado de exceções.
 - Respostas JSON personalizadas para erros de autenticação (`401`) e autorização (`403`).
-- Documentação OpenAPI com Swagger UI e suporte a autenticação Bearer JWT.
+- Documentação OpenAPI com Swagger UI e autenticação Bearer JWT.
 - Testes unitários e testes HTTP automatizados.
+- Execução com Docker e Docker Compose e deploy em nuvem.
 
 ## Tecnologias
 
@@ -23,11 +35,13 @@ O **AuthGuard** é um projeto Back-End desenvolvido em **Java 21 e Spring Boot 4
 | Spring Boot 4.1.1 | Framework da aplicação |
 | Spring Web MVC | Endpoints REST |
 | Spring Security | Autenticação e autorização |
-| OAuth2 Resource Server | Validação dos JWTs |
-| Supabase Auth | Emissão e gerenciamento de autenticação |
+| OAuth2 Resource Server | Validação de JWTs |
+| Supabase Auth | Emissão e gerenciamento de tokens de autenticação |
 | Spring Data JPA / Hibernate | Persistência de dados |
 | PostgreSQL | Banco de dados relacional |
-| Docker Compose | Ambiente local do PostgreSQL |
+| Docker e Docker Compose | Containerização da API e ambiente local |
+| Neon | PostgreSQL gerenciado em nuvem |
+| Render | Hospedagem da API |
 | Jakarta Validation | Validação de entrada |
 | Springdoc OpenAPI / Swagger UI | Documentação interativa |
 | JUnit 5, Mockito e MockMvc | Testes automatizados |
@@ -36,7 +50,7 @@ O **AuthGuard** é um projeto Back-End desenvolvido em **Java 21 e Spring Boot 4
 
 ## Arquitetura
 
-A aplicação segue uma separação de responsabilidades em camadas:
+A aplicação segue uma organização em camadas:
 
 ```text
 src/
@@ -46,11 +60,11 @@ src/
 │   │   ├── controller/   # Endpoints HTTP
 │   │   ├── dto/          # Dados de entrada, saída e erros
 │   │   ├── entity/       # Entidades persistidas
-│   │   ├── enums/        # Papéis de usuário (USER e ADMIN)
+│   │   ├── enums/        # Papéis USER e ADMIN
 │   │   ├── exception/    # Exceções e tratamento global
 │   │   ├── mapper/       # Conversão Entity → DTO
 │   │   ├── repository/   # Acesso ao PostgreSQL
-│   │   ├── security/     # Extração de identidade e handlers de segurança
+│   │   ├── security/     # Identidade autenticada e handlers
 │   │   └── service/      # Regras de negócio e permissões
 │   └── resources/
 │       └── application.yaml
@@ -64,21 +78,21 @@ src/
 
 ### Autenticação e autorização
 
-O Supabase Auth **emite o JWT**. O AuthGuard atua como **Resource Server**, validando tokens por meio da configuração JWT e das chaves públicas disponibilizadas pelo provedor (JWKS). A API não implementa um endpoint próprio de login ou emissão de JWT.
+O **Supabase Auth emite o JWT**. O AuthGuard atua como **OAuth2 Resource Server**, validando os tokens com as chaves públicas do provedor (JWKS). A aplicação não implementa um endpoint próprio de login ou emissão de tokens.
 
-1. O cliente se autentica pelo Supabase Auth e obtém um access token.
-2. Envia `Authorization: Bearer <token>` às rotas protegidas.
-3. O Spring Security valida o token, e a aplicação extrai seu `sub` (UUID) e `email`.
-4. Para operações administrativas, o `PermissaoService` consulta o papel (`Role`) do usuário no PostgreSQL.
+1. O cliente se autentica no Supabase Auth e obtém um access token.
+2. Envia `Authorization: Bearer <token>` aos endpoints protegidos.
+3. O Spring Security valida o JWT; a aplicação extrai `sub` (UUID) e `email`.
+4. Para operações administrativas, o `PermissaoService` consulta a role do usuário no PostgreSQL.
 5. A operação é autorizada ou rejeitada conforme a identidade e as permissões.
 
-> **Importante:** a role `ADMIN` não é atribuída pelo cliente nem confiada simplesmente a uma claim do JWT; a autorização administrativa depende do registro persistido no banco de dados.
+> A role `ADMIN` não é atribuída pelo cliente nem aceita apenas por uma claim do JWT. A autorização administrativa depende do registro persistido no banco de dados.
 
 ## Endpoints
 
-Todos os endpoints abaixo exigem JWT válido.
+Todos os endpoints abaixo exigem um JWT válido.
 
-| Método | Rota | Descrição | Acesso | Resposta de sucesso |
+| Método | Rota | Descrição | Acesso | Sucesso |
 |---|---|---|---|---|
 | `POST` | `/api/user/profile` | Criar o próprio perfil | Autenticado | `201 Created` |
 | `GET` | `/api/user/profile` | Consultar o próprio perfil | Autenticado | `200 OK` |
@@ -100,7 +114,7 @@ Content-Type: application/json
 }
 ```
 
-**Exemplo de resposta (`201`):**
+**Exemplo de resposta (`201 Created`):**
 
 ```json
 {
@@ -108,11 +122,11 @@ Content-Type: application/json
   "nome": "Farao",
   "email": "user@example.com",
   "role": "USER",
-  "criadoEm": "2026-10-17T14:24:38.274811"
+  "criadoEm": "2026-10-23T16:36:49.163947791"
 }
 ```
 
-O `id` e o `email` são obtidos da identidade autenticada, e não enviados no corpo do cadastro.
+O `id` e o `email` são extraídos da identidade autenticada, não enviados no corpo da requisição. Os valores da resposta acima são ilustrativos.
 
 ### Exemplo — Atualizar perfil
 
@@ -128,7 +142,7 @@ O campo `nome` é obrigatório e deve conter entre **3 e 100 caracteres**, confo
 
 ### Tratamento de erros
 
-A aplicação padroniza erros com campos como:
+Os erros são padronizados em JSON. Exemplo ilustrativo:
 
 ```json
 {
@@ -139,112 +153,139 @@ A aplicação padroniza erros com campos como:
 }
 ```
 
-*Os valores acima são ilustrativos.* Entre os cenários tratados estão `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found` e `409 Conflict`.
+Entre os cenários tratados estão `400 Bad Request`, `401 Unauthorized`, `403 Forbidden`, `404 Not Found` e `409 Conflict`.
 
 ## Executando localmente
 
 ### Pré-requisitos
 
-- **JDK 21**
-- **Docker** com Docker Compose
-- Acesso a um projeto **Supabase Auth** configurado para emissão dos JWTs esperados pela API
-- Terminal com suporte aos comandos abaixo (exemplos para Linux/macOS)
+- **Docker** com Docker Compose, para executar a aplicação em contêineres.
+- **JDK 21**, se optar por executar o Spring Boot diretamente pelo Maven.
+- Um projeto **Supabase Auth** capaz de emitir os JWTs esperados pela API.
+- Terminal com suporte aos comandos abaixo (exemplos para Linux/macOS).
 
-### 1. Obter o projeto
+### 1. Clonar o repositório
 
 ```bash
-git clone https://github.com/ruanxanel/authguard-api
+git clone https://github.com/ruanxanel/authguard-api.git
 cd authguard-api
 ```
 
-### 2. Configurar as variáveis de ambiente
+### 2. Configurar variáveis de ambiente
 
-Se o repositório incluir `.env.example`, utilize-o como referência:
+Crie o arquivo `.env` a partir do exemplo:
 
 ```bash
 cp .env.example .env
 ```
 
-Configure no `.env` as variáveis consumidas pela aplicação e pelo Docker, por exemplo:
+Confira as variáveis necessárias ao `compose.yaml`:
 
 ```dotenv
+POSTGRES_DB=authguard_db
 POSTGRES_USER=seu_usuario_local
 POSTGRES_PASSWORD=sua_senha_local
 ```
 
-Confira também as demais variáveis exigidas pelo seu arquivo Docker Compose. **Nunca versionar `.env`, senhas, access tokens ou chaves privadas.**
+Os valores acima são exemplos: escolha credenciais locais e **não envie o `.env` ao GitHub**.
 
-A configuração local usada durante o desenvolvimento apontou para `jdbc:postgresql://localhost:5434/authguard_db`. Caso sua configuração seja diferente, ajuste `application.yaml` e o mapeamento de portas do Docker Compose de forma consistente.
-
-### 3. Iniciar o PostgreSQL
-
-Se o projeto incluir um `compose.yaml` ou `docker-compose.yml` configurado:
+### 3. Executar API e PostgreSQL com Docker Compose
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 docker compose ps
 ```
 
-### 4. Carregar o `.env` e executar a API
+O Compose inicia o PostgreSQL e a API na mesma rede. No ambiente local, a API fica disponível em `http://localhost:8080`, enquanto a porta externa do PostgreSQL é `5434`.
 
-O Maven não carrega automaticamente variáveis definidas apenas no arquivo `.env`. No mesmo terminal em que iniciará a aplicação:
+Para acompanhar os logs:
 
 ```bash
+docker compose logs -f authguard-api
+```
+
+Para encerrar os serviços sem apagar o volume do banco:
+
+```bash
+docker compose down
+```
+
+> **Cuidado:** `docker compose down -v` também remove o volume declarado do PostgreSQL e pode apagar os dados locais.
+
+### 4. Alternativa: executar Spring Boot diretamente pelo Maven
+
+Se quiser rodar a aplicação fora do contêiner, inicie somente o PostgreSQL e carregue as variáveis do `.env` no terminal:
+
+```bash
+docker compose up -d postgres
 set -a
 source .env
 set +a
 ./mvnw spring-boot:run
 ```
 
-No Windows, configure as variáveis de ambiente pelo terminal ou pela IDE antes de executar o Maven.
+A configuração padrão do `application.yaml` utiliza `jdbc:postgresql://localhost:5434/authguard_db`. Não inicie simultaneamente a API no Docker e pelo Maven na mesma porta `8080`.
 
-### 5. Testar o projeto
+### 5. Executar os testes
+
+Com o PostgreSQL local disponível e as variáveis carregadas:
 
 ```bash
 ./mvnw test
 ```
 
-Para executar uma classe de testes específica:
+Para executar uma classe específica:
 
 ```bash
 ./mvnw -Dtest=UsuarioControllerTest test
 ```
 
-Os testes que carregam o contexto completo do Spring podem precisar do banco e das variáveis de ambiente locais.
+Alguns testes carregam o contexto Spring completo e podem depender das variáveis e do PostgreSQL local.
 
 ## Swagger / OpenAPI
 
-Com a API em execução, acesse:
+Documentação interativa com suporte ao esquema Bearer JWT.
 
-- **Swagger UI:** http://localhost:8080/swagger-ui.html
-- **Especificação OpenAPI:** http://localhost:8080/v3/api-docs
+### Produção
 
-Para testar rotas protegidas no Swagger:
+- **Swagger UI:** https://authguard-api-bmzi.onrender.com/swagger-ui/index.html
+- **OpenAPI JSON:** https://authguard-api-bmzi.onrender.com/v3/api-docs
 
-1. Autentique-se pelo Supabase e obtenha um access token válido.
-2. Clique em **Authorize** na interface Swagger.
-3. Informe somente o token no esquema Bearer, **sem** digitar `Bearer` novamente.
-4. Selecione um endpoint, clique em **Try it out** e em **Execute**.
+### Desenvolvimento local
 
-> A documentação Swagger é liberada localmente para facilitar o desenvolvimento. Para produção, avalie restringi-la por ambiente ou autenticação.
+- **Swagger UI:** http://localhost:8080/swagger-ui/index.html
+- **OpenAPI JSON:** http://localhost:8080/v3/api-docs
+
+### Como testar
+
+1. Obtenha um access token válido do Supabase Auth.
+2. Acesse o Swagger UI e clique em **Authorize**.
+3. Informe somente o token, sem repetir `Bearer`.
+4. Escolha um endpoint, clique em **Try it out** e depois em **Execute**.
+
+> Não compartilhe capturas que exibam o access token completo: ele é uma credencial de acesso.
 
 ## Testes automatizados
 
-O projeto possui testes para:
+O projeto possui testes que cobrem:
 
-- Regras de negócio em `UsuarioService`, `PermissaoService` e `AdminService`.
-- Autenticação e autorização de rotas administrativas (`401`, `403` e `200`).
-- Criação, consulta e atualização de perfis via MockMvc.
-- Validação de campos e respostas de erro (`400`, `404` e `409`).
-- Extração de UUID e e-mail a partir do JWT.
-- Rejeição de tokens malformados ou com assinatura fictícia.
+- Regras de negócio de `UsuarioService`, `PermissaoService` e `AdminService`.
+- Autenticação e autorização das rotas administrativas (`401`, `403` e `200`).
+- Criação, consulta e atualização de perfis com MockMvc.
+- Validações de entrada e respostas de erro (`400`, `404` e `409`).
+- Extração de UUID e e-mail dos objetos JWT.
+- Rejeição de tokens malformados e de um token com assinatura fictícia.
 
-**Nota:** testes que utilizam `jwt()` do Spring Security Test simulam um usuário autenticado; não substituem testes criptográficos com JWTs realmente assinados.
+**Nota:** o `jwt()` do Spring Security Test simula um usuário autenticado, mas não substitui testes criptográficos com JWTs realmente assinados.
 
 ## Observações para produção
 
-Antes de publicar a API, revise as variáveis de ambiente, a conexão PostgreSQL, os emissores e audiências aceitos nos JWTs, o algoritmo de assinatura e as permissões administrativas. Evite publicar com `spring.jpa.hibernate.ddl-auto: update` e `spring.jpa.show-sql: true` sem uma decisão consciente; para produção, prefira migrações de banco e configuração de logs adequada.
+- O deploy utiliza variáveis de ambiente configuradas no Render, sem salvar senhas do Neon no repositório.
+- O banco Neon é independente do PostgreSQL local; os dados não são transferidos automaticamente.
+- Para ambientes com dados importantes, prefira migrações de banco (por exemplo, Flyway) a manter `ddl-auto=update` permanentemente.
+- Avalie desativar `spring.jpa.open-in-view` e restringir a documentação pública do Swagger em produção.
+- Mantenha a verificação do emissor, audiência, assinatura e algoritmo JWT compatível com o Supabase Auth.
 
 ## Objetivo do projeto
 
-O AuthGuard foi desenvolvido como parte da evolução prática em **desenvolvimento Back-End com Java e Spring Boot**, reunindo autenticação externa, autorização baseada em papéis, API REST, persistência relacional, documentação e testes automatizados em um único projeto.
+O AuthGuard foi desenvolvido como parte da evolução prática em **desenvolvimento Back-End com Java e Spring Boot**, reunindo autenticação externa, autorização baseada em papéis, API REST, persistência relacional, Docker, documentação e testes automatizados em um único projeto.
