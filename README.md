@@ -153,8 +153,8 @@ A aplicação padroniza erros com campos como:
 ### 1. Obter o projeto
 
 ```bash
-git clone <URL_DO_REPOSITORIO_AUTHGUARD>
-cd authguard
+git clone https://github.com/ruanxanel/authguard-api
+cd authguard-api
 ```
 
 ### 2. Configurar as variáveis de ambiente
